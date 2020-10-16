@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   (c) 2009-2016 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
  *
  * QGroundControl is licensed according to the terms in the file
  * COPYING.md in the root of the source code directory.
@@ -8,7 +8,7 @@
  ****************************************************************************/
 
 import QtQuick          2.3
-import QtQuick.Controls 1.2
+import QtQuick.Controls 2.4
 import QtQuick.Dialogs  1.2
 import QtQuick.Layouts  1.11
 
@@ -31,18 +31,11 @@ SetupPage {
             width:  availableWidth
             height: Math.max(leftColumn.height, rightColumn.height)
 
-            readonly property string    dialogTitle:            qsTr("Radio")
-            readonly property real      labelToMonitorMargin:   defaultTextWidth * 3
+            readonly property string  dialogTitle: qsTr("Radio")
 
-            property bool controllerCompleted:      false
-            property bool controllerAndViewReady:   false
-
-            Component.onCompleted: {
-                if (controllerCompleted) {
-                    controllerAndViewReady = true
-                    controller.start()
-                    updateChannelCount()
-                }
+            function setupPageCompleted() {
+                controller.start()
+                updateChannelCount()
             }
 
             function updateChannelCount()
@@ -53,32 +46,19 @@ SetupPage {
 
             RadioComponentController {
                 id:             controller
-                factPanel:      radioPage.viewPanel
                 statusText:     statusText
                 cancelButton:   cancelButton
                 nextButton:     nextButton
                 skipButton:     skipButton
-
-                Component.onCompleted: {
-                    controllerCompleted = true
-                    if (qgcView.completedSignalled) {
-                        controllerAndViewReady = true
-                        controller.start()
-                        updateChannelCount()
-                    }
-                }
-
                 onChannelCountChanged:              updateChannelCount()
-                onFunctionMappingChangedAPMReboot:  showMessage(qsTr("Reboot required"), qsTr("Your stick mappings have changed, you must reboot the vehicle for correct operation."), StandardButton.Ok)
-                onThrottleReversedCalFailure:       showMessage(qsTr("Throttle channel reversed"), qsTr("Calibration failed. The throttle channel on your transmitter is reversed. You must correct this on your transmitter in order to complete calibration."), StandardButton.Ok)
+                onFunctionMappingChangedAPMReboot:  mainWindow.showMessageDialog(qsTr("Reboot required"), qsTr("Your stick mappings have changed, you must reboot the vehicle for correct operation."))
+                onThrottleReversedCalFailure:       mainWindow.showMessageDialog(qsTr("Throttle channel reversed"), qsTr("Calibration failed. The throttle channel on your transmitter is reversed. You must correct this on your transmitter in order to complete calibration."))
             }
 
             Component {
                 id: copyTrimsDialogComponent
-
                 QGCViewMessage {
                     message: qsTr("Center your sticks and move throttle all the way down, then press Ok to copy trims. After pressing Ok, reset the trims on your radio back to zero.")
-
                     function accept() {
                         hideDialog()
                         controller.copyTrims()
@@ -88,11 +68,9 @@ SetupPage {
 
             Component {
                 id: zeroTrimsDialogComponent
-
                 QGCViewMessage {
                     message: qsTr("Before calibrating you should zero all your trims and subtrims. Click Ok to start Calibration.\n\n%1").arg(
                                  (QGroundControl.multiVehicleManager.activeVehicle.px4Firmware ? "" : qsTr("Please ensure all motor power is disconnected AND all props are removed from the vehicle.")))
-
                     function accept() {
                         hideDialog()
                         controller.nextButtonClicked()
@@ -102,7 +80,6 @@ SetupPage {
 
             Component {
                 id: channelCountDialogComponent
-
                 QGCViewMessage {
                     message: controller.channelCount == 0 ? qsTr("Please turn on transmitter.") : qsTr("%1 channels or more are needed to fly.").arg(controller.minChannelCount)
                 }
@@ -110,17 +87,18 @@ SetupPage {
 
             Component {
                 id: spektrumBindDialogComponent
-
                 QGCViewDialog {
 
                     function accept() {
-                        controller.spektrumBindMode(radioGroup.current.bindMode)
+                        controller.spektrumBindMode(radioGroup.checkedButton.bindMode)
                         hideDialog()
                     }
 
                     function reject() {
                         hideDialog()
                     }
+
+                    ButtonGroup { id: radioGroup }
 
                     Column {
                         anchors.fill:   parent
@@ -132,27 +110,22 @@ SetupPage {
                             text:       qsTr("Click Ok to place your Spektrum receiver in the bind mode. Select the specific receiver type below:")
                         }
 
-                        ExclusiveGroup { id: radioGroup }
-
                         QGCRadioButton {
-                            exclusiveGroup: radioGroup
-                            text:           qsTr("DSM2 Mode")
-
+                            text:               qsTr("DSM2 Mode")
+                            ButtonGroup.group:  radioGroup
                             property int bindMode: RadioComponentController.DSM2
                         }
 
                         QGCRadioButton {
-                            exclusiveGroup: radioGroup
-                            text:           qsTr("DSMX (7 channels or less)")
-
+                            text:               qsTr("DSMX (7 channels or less)")
+                            ButtonGroup.group:  radioGroup
                             property int bindMode: RadioComponentController.DSMX7
                         }
 
                         QGCRadioButton {
-                            exclusiveGroup: radioGroup
-                            checked:        true
-                            text:           qsTr("DSMX (8 channels or more)")
-
+                            checked:            true
+                            text:               qsTr("DSMX (8 channels or more)")
+                            ButtonGroup.group:  radioGroup
                             property int bindMode: RadioComponentController.DSMX8
                         }
                     }
@@ -187,7 +160,7 @@ SetupPage {
                     // Center point
                     Rectangle {
                         anchors.horizontalCenter:   parent.horizontalCenter
-                        width:                      defaultTextWidth / 2
+                        width:                      globals.defaultTextWidth / 2
                         height:                     parent.height
                         color:                      qgcPal.window
                     }
@@ -237,10 +210,10 @@ SetupPage {
 
                     Item {
                         width:  parent.width
-                        height: defaultTextHeight * 2
+                        height: globals.defaultTextHeight * 2
                         QGCLabel {
                             id:     rollLabel
-                            width:  defaultTextWidth * 10
+                            width:  globals.defaultTextWidth * 10
                             text:   qsTr("Roll")
                         }
 
@@ -248,11 +221,10 @@ SetupPage {
                             id:                 rollLoader
                             anchors.left:       rollLabel.right
                             anchors.right:      parent.right
-                            height:             radioPage.defaultTextHeight
+                            height:             globals.defaultTextHeight
                             width:              100
                             sourceComponent:    channelMonitorDisplayComponent
 
-                            property real defaultTextWidth: radioPage.defaultTextWidth
                             property bool mapped:           controller.rollChannelMapped
                             property bool reversed:         controller.rollChannelReversed
                         }
@@ -266,11 +238,11 @@ SetupPage {
 
                     Item {
                         width:  parent.width
-                        height: defaultTextHeight * 2
+                        height: globals.defaultTextHeight * 2
 
                         QGCLabel {
                             id:     pitchLabel
-                            width:  defaultTextWidth * 10
+                            width:  globals.defaultTextWidth * 10
                             text:   qsTr("Pitch")
                         }
 
@@ -278,11 +250,10 @@ SetupPage {
                             id:                 pitchLoader
                             anchors.left:       pitchLabel.right
                             anchors.right:      parent.right
-                            height:             radioPage.defaultTextHeight
+                            height:             globals.defaultTextHeight
                             width:              100
                             sourceComponent:    channelMonitorDisplayComponent
 
-                            property real defaultTextWidth: radioPage.defaultTextWidth
                             property bool mapped:           controller.pitchChannelMapped
                             property bool reversed:         controller.pitchChannelReversed
                         }
@@ -296,11 +267,11 @@ SetupPage {
 
                     Item {
                         width:  parent.width
-                        height: defaultTextHeight * 2
+                        height: globals.defaultTextHeight * 2
 
                         QGCLabel {
                             id:     yawLabel
-                            width:  defaultTextWidth * 10
+                            width:  globals.defaultTextWidth * 10
                             text:   qsTr("Yaw")
                         }
 
@@ -308,11 +279,10 @@ SetupPage {
                             id:                 yawLoader
                             anchors.left:       yawLabel.right
                             anchors.right:      parent.right
-                            height:             radioPage.defaultTextHeight
+                            height:             globals.defaultTextHeight
                             width:              100
                             sourceComponent:    channelMonitorDisplayComponent
 
-                            property real defaultTextWidth: radioPage.defaultTextWidth
                             property bool mapped:           controller.yawChannelMapped
                             property bool reversed:         controller.yawChannelReversed
                         }
@@ -326,11 +296,11 @@ SetupPage {
 
                     Item {
                         width:  parent.width
-                        height: defaultTextHeight * 2
+                        height: globals.defaultTextHeight * 2
 
                         QGCLabel {
                             id:     throttleLabel
-                            width:  defaultTextWidth * 10
+                            width:  globals.defaultTextWidth * 10
                             text:   qsTr("Throttle")
                         }
 
@@ -338,11 +308,10 @@ SetupPage {
                             id:                 throttleLoader
                             anchors.left:       throttleLabel.right
                             anchors.right:      parent.right
-                            height:             radioPage.defaultTextHeight
+                            height:             globals.defaultTextHeight
                             width:              100
                             sourceComponent:    channelMonitorDisplayComponent
 
-                            property real defaultTextWidth: radioPage.defaultTextWidth
                             property bool mapped:           controller.throttleChannelMapped
                             property bool reversed:         controller.throttleChannelReversed
                         }
@@ -377,7 +346,7 @@ SetupPage {
 
                         onClicked: {
                             if (text === qsTr("Calibrate")) {
-                                showDialog(zeroTrimsDialogComponent, dialogTitle, radioPage.showDialogDefaultWidth, StandardButton.Ok | StandardButton.Cancel)
+                                mainWindow.showComponentDialog(zeroTrimsDialogComponent, dialogTitle, mainWindow.showDialogDefaultWidth, StandardButton.Ok | StandardButton.Cancel)
                             } else {
                                 controller.nextButtonClicked()
                             }
@@ -437,12 +406,12 @@ SetupPage {
                     QGCButton {
                         id:         bindButton
                         text:       qsTr("Spektrum Bind")
-                        onClicked:  showDialog(spektrumBindDialogComponent, dialogTitle, radioPage.showDialogDefaultWidth, StandardButton.Ok | StandardButton.Cancel)
+                        onClicked:  mainWindow.showComponentDialog(spektrumBindDialogComponent, dialogTitle, mainWindow.showDialogDefaultWidth, StandardButton.Ok | StandardButton.Cancel)
                     }
 
                     QGCButton {
                         text:       qsTr("Copy Trims")
-                        onClicked:  showDialog(copyTrimsDialogComponent, dialogTitle, radioPage.showDialogDefaultWidth, StandardButton.Ok | StandardButton.Cancel)
+                        onClicked:  mainWindow.showComponentDialog(copyTrimsDialogComponent, dialogTitle, mainWindow.showDialogDefaultWidth, StandardButton.Ok | StandardButton.Cancel)
                     }
                 }
             } // Column - Left Column
@@ -464,22 +433,16 @@ SetupPage {
                 Row {
                     spacing: ScreenTools.defaultFontPixelWidth
 
-                    ExclusiveGroup { id: modeGroup }
-
                     QGCRadioButton {
-                        exclusiveGroup: modeGroup
-                        text:           qsTr("Mode 1")
-                        checked:        controller.transmitterMode == 1
-
-                        onClicked: controller.transmitterMode = 1
+                        text:       qsTr("Mode 1")
+                        checked:    controller.transmitterMode == 1
+                        onClicked:  controller.transmitterMode = 1
                     }
 
                     QGCRadioButton {
-                        exclusiveGroup: modeGroup
-                        text:           qsTr("Mode 2")
-                        checked:        controller.transmitterMode == 2
-
-                        onClicked: controller.transmitterMode = 2
+                        text:       qsTr("Mode 2")
+                        checked:    controller.transmitterMode == 2
+                        onClicked:  controller.transmitterMode = 2
                     }
                 }
 
@@ -495,6 +458,6 @@ SetupPage {
                     twoColumn:  true
                 }
             } // Column - Right Column
-        } // Item    
+        } // Item
     } // Component - pageComponent
 } // SetupPage

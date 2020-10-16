@@ -1,17 +1,14 @@
 /****************************************************************************
  *
- *   (c) 2009-2016 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
  *
  * QGroundControl is licensed according to the terms in the file
  * COPYING.md in the root of the source code directory.
  *
  ****************************************************************************/
 
-
-/// @file
-///     @author Don Gagne <don@thegagnes.com>
-
 #include "QGroundControlQmlGlobal.h"
+#include "LinkManager.h"
 
 #include <QSettings>
 #include <QLineF>
@@ -66,6 +63,11 @@ void QGroundControlQmlGlobal::setToolbox(QGCToolbox* toolbox)
     _settingsManager        = toolbox->settingsManager();
     _gpsRtkFactGroup        = qgcApp()->gpsRtkFactGroup();
     _airspaceManager        = toolbox->airspaceManager();
+    _adsbVehicleManager     = toolbox->adsbVehicleManager();
+    _globalPalette          = new QGCPalette(this);
+#if defined(QGC_ENABLE_PAIRING)
+    _pairingManager         = toolbox->pairingManager();
+#endif
 #if defined(QGC_GST_TAISYNC_ENABLED)
     _taisyncManager         = toolbox->taisyncManager();
 #endif
@@ -147,17 +149,25 @@ void QGroundControlQmlGlobal::startAPMArduSubMockLink(bool sendStatusText)
 #endif
 }
 
+void QGroundControlQmlGlobal::startAPMArduRoverMockLink(bool sendStatusText)
+{
+#ifdef QT_DEBUG
+    MockLink::startAPMArduRoverMockLink(sendStatusText);
+#else
+    Q_UNUSED(sendStatusText);
+#endif
+}
+
 void QGroundControlQmlGlobal::stopOneMockLink(void)
 {
 #ifdef QT_DEBUG
-    LinkManager* linkManager = qgcApp()->toolbox()->linkManager();
+    QList<SharedLinkInterfacePtr> sharedLinks = _toolbox->linkManager()->links();
 
-    for (int i=0; i<linkManager->links().count(); i++) {
-        LinkInterface* link = linkManager->links()[i];
+    for (int i=0; i<sharedLinks.count(); i++) {
+        LinkInterface* link = sharedLinks[i].get();
         MockLink* mockLink = qobject_cast<MockLink*>(link);
-
         if (mockLink) {
-            linkManager->disconnectLink(mockLink);
+            mockLink->disconnect();
             return;
         }
     }
@@ -176,26 +186,41 @@ void QGroundControlQmlGlobal::setMavlinkSystemID(int id)
     emit mavlinkSystemIDChanged(id);
 }
 
-int QGroundControlQmlGlobal::supportedFirmwareCount()
+bool QGroundControlQmlGlobal::singleFirmwareSupport(void)
 {
-    return _firmwarePluginManager->supportedFirmwareTypes().count();
+    return _firmwarePluginManager->supportedFirmwareClasses().count() == 1;
+}
+
+bool QGroundControlQmlGlobal::singleVehicleSupport(void)
+{
+    if (singleFirmwareSupport()) {
+        return _firmwarePluginManager->supportedVehicleClasses(_firmwarePluginManager->supportedFirmwareClasses()[0]).count() == 1;
+    }
+
+    return false;
 }
 
 bool QGroundControlQmlGlobal::px4ProFirmwareSupported()
 {
-    return _firmwarePluginManager->supportedFirmwareTypes().contains(MAV_AUTOPILOT_PX4);
+    return _firmwarePluginManager->supportedFirmwareClasses().contains(QGCMAVLink::FirmwareClassPX4);
 }
 
 bool QGroundControlQmlGlobal::apmFirmwareSupported()
 {
-    return _firmwarePluginManager->supportedFirmwareTypes().contains(MAV_AUTOPILOT_ARDUPILOTMEGA);
+    return _firmwarePluginManager->supportedFirmwareClasses().contains(QGCMAVLink::FirmwareClassArduPilot);
 }
 
 bool QGroundControlQmlGlobal::linesIntersect(QPointF line1A, QPointF line1B, QPointF line2A, QPointF line2B)
 {
     QPointF intersectPoint;
 
-    return QLineF(line1A, line1B).intersect(QLineF(line2A, line2B), &intersectPoint) == QLineF::BoundedIntersection &&
+#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+    auto intersect = QLineF(line1A, line1B).intersect(QLineF(line2A, line2B), &intersectPoint);
+#else
+    auto intersect = QLineF(line1A, line1B).intersects(QLineF(line2A, line2B), &intersectPoint);
+#endif
+
+    return  intersect == QLineF::BoundedIntersection &&
             intersectPoint != line1A && intersectPoint != line1B;
 }
 
@@ -223,4 +248,54 @@ void QGroundControlQmlGlobal::setFlightMapZoom(double zoom)
         _zoom = zoom;
         emit flightMapZoomChanged(zoom);
     }
+}
+
+QString QGroundControlQmlGlobal::qgcVersion(void) const
+{
+    QString versionStr = qgcApp()->applicationVersion();
+#ifdef __androidArm32__
+    versionStr += QStringLiteral(" %1").arg(tr("32 bit"));
+#elif __androidArm64__
+    versionStr += QStringLiteral(" %1").arg(tr("64 bit"));
+#endif
+    return versionStr;
+}
+
+QString QGroundControlQmlGlobal::altitudeModeExtraUnits(AltitudeMode altMode)
+{
+    switch (altMode) {
+    case AltitudeModeNone:
+        return QString();
+    case AltitudeModeRelative:
+        // Showing (Rel) all the time ends up being too noisy
+        return QString();
+    case AltitudeModeAbsolute:
+        return tr("(AMSL)");
+    case AltitudeModeAboveTerrain:
+        return tr("(Abv Terr)");
+    case AltitudeModeTerrainFrame:
+        return tr("(TerrF)");
+    }
+
+    // Should never get here but makes some compilers happy
+    return QString();
+}
+
+QString QGroundControlQmlGlobal::altitudeModeShortDescription(AltitudeMode altMode)
+{
+    switch (altMode) {
+    case AltitudeModeNone:
+        return QString();
+    case AltitudeModeRelative:
+        return tr("Relative To Launch");
+    case AltitudeModeAbsolute:
+        return tr("Above Mean Sea Level");
+    case AltitudeModeAboveTerrain:
+        return tr("Above Terrain");
+    case AltitudeModeTerrainFrame:
+        return tr("Terrain Frame");
+    }
+
+    // Should never get here but makes some compilers happy
+    return QString();
 }

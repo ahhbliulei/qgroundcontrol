@@ -1,12 +1,11 @@
 /****************************************************************************
  *
- *   (c) 2009-2016 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
  *
  * QGroundControl is licensed according to the terms in the file
  * COPYING.md in the root of the source code directory.
  *
  ****************************************************************************/
-
 
 #include <QTimer>
 #include <QList>
@@ -24,10 +23,10 @@
 ///
 ///     @author Don Gagne <don@thegagnes.com>
 
-TCPLink::TCPLink(SharedLinkConfigurationPointer& config)
+TCPLink::TCPLink(SharedLinkConfigurationPtr& config)
     : LinkInterface(config)
-    , _tcpConfig(qobject_cast<TCPConfiguration*>(config.data()))
-    , _socket(NULL)
+    , _tcpConfig(qobject_cast<TCPConfiguration*>(config.get()))
+    , _socket(nullptr)
     , _socketIsConnected(false)
 {
     Q_ASSERT(_tcpConfig);
@@ -36,7 +35,7 @@ TCPLink::TCPLink(SharedLinkConfigurationPointer& config)
 
 TCPLink::~TCPLink()
 {
-    _disconnect();
+    disconnect();
     // Tell the thread to exit
     quit();
     // Wait for it to exit
@@ -57,7 +56,7 @@ void TCPLink::_writeDebugBytes(const QByteArray data)
     for (int i=0, size = data.size(); i<size; i++)
     {
         unsigned char v = data[i];
-        bytes.append(QString().sprintf("%02x ", v));
+        bytes.append(QString::asprintf("%02x ", v));
         if (data[i] > 31 && data[i] < 127)
         {
             ascii.append(data[i]);
@@ -81,16 +80,10 @@ void TCPLink::_writeBytes(const QByteArray data)
 
     if (_socket) {
         _socket->write(data);
-        _logOutputDataRate(data.size(), QDateTime::currentMSecsSinceEpoch());
+        emit bytesSent(this, data);
     }
 }
 
-/**
- * @brief Read a number of bytes from the interface.
- *
- * @param data Pointer to the data byte array to write the bytes to
- * @param maxLength The maximum number of bytes to write
- **/
 void TCPLink::readBytes()
 {
     if (_socket) {
@@ -101,7 +94,6 @@ void TCPLink::readBytes()
             buffer.resize(byteCount);
             _socket->read(buffer.data(), buffer.size());
             emit bytesReceived(this, buffer);
-            _logInputDataRate(byteCount, QDateTime::currentMSecsSinceEpoch());
 #ifdef TCPLINK_READWRITE_DEBUG
             writeDebugBytes(buffer.data(), buffer.size());
 #endif
@@ -109,12 +101,7 @@ void TCPLink::readBytes()
     }
 }
 
-/**
- * @brief Disconnect the connection.
- *
- * @return True if connection has been disconnected, false if connection couldn't be disconnected.
- **/
-void TCPLink::_disconnect(void)
+void TCPLink::disconnect(void)
 {
     quit();
     wait();
@@ -123,16 +110,11 @@ void TCPLink::_disconnect(void)
         _socket->disconnectFromHost(); // Disconnect tcp
         _socket->waitForDisconnected();        
         _socket->deleteLater(); // Make sure delete happens on correct thread
-        _socket = NULL;
+        _socket = nullptr;
         emit disconnected();
     }
 }
 
-/**
- * @brief Connect the connection.
- *
- * @return True if connection has been established, false if connection couldn't be established.
- **/
 bool TCPLink::_connect(void)
 {
     if (isRunning())
@@ -146,15 +128,24 @@ bool TCPLink::_connect(void)
 
 bool TCPLink::_hardwareConnect()
 {
-    Q_ASSERT(_socket == NULL);
+    Q_ASSERT(_socket == nullptr);
     _socket = new QTcpSocket();
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
     QSignalSpy errorSpy(_socket, static_cast<void (QTcpSocket::*)(QAbstractSocket::SocketError)>(&QTcpSocket::error));
+#else
+    QSignalSpy errorSpy(_socket, &QAbstractSocket::errorOccurred);
+#endif
+
     _socket->connectToHost(_tcpConfig->address(), _tcpConfig->port());
     QObject::connect(_socket, &QTcpSocket::readyRead, this, &TCPLink::readBytes);
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
     QObject::connect(_socket,static_cast<void (QTcpSocket::*)(QAbstractSocket::SocketError)>(&QTcpSocket::error),
                      this, &TCPLink::_socketError);
+#else
+    QObject::connect(_socket, &QAbstractSocket::errorOccurred, this, &TCPLink::_socketError);
+#endif
 
     // Give the socket a second to connect to the other side otherwise error out
     if (!_socket->waitForConnected(1000))
@@ -165,7 +156,7 @@ bool TCPLink::_hardwareConnect()
             emit communicationError(tr("Link Error"), tr("Error on link %1. Connection failed").arg(getName()));
         }
         delete _socket;
-        _socket = NULL;
+        _socket = nullptr;
         return false;
     }
     _socketIsConnected = true;
@@ -194,21 +185,6 @@ QString TCPLink::getName() const
     return _tcpConfig->name();
 }
 
-qint64 TCPLink::getConnectionSpeed() const
-{
-    return 54000000; // 54 Mbit
-}
-
-qint64 TCPLink::getCurrentInDataRate() const
-{
-    return 0;
-}
-
-qint64 TCPLink::getCurrentOutDataRate() const
-{
-    return 0;
-}
-
 void TCPLink::waitForBytesWritten(int msecs)
 {
     Q_ASSERT(_socket);
@@ -219,15 +195,6 @@ void TCPLink::waitForReadyRead(int msecs)
 {
     Q_ASSERT(_socket);
     _socket->waitForReadyRead(msecs);
-}
-
-void TCPLink::_restartConnection()
-{
-    if(this->isConnected())
-    {
-        _disconnect();
-        _connect();
-    }
 }
 
 //--------------------------------------------------------------------------
@@ -280,8 +247,8 @@ TCPConfiguration::TCPConfiguration(TCPConfiguration* source) : LinkConfiguration
 void TCPConfiguration::copyFrom(LinkConfiguration *source)
 {
     LinkConfiguration::copyFrom(source);
-    TCPConfiguration* usource = dynamic_cast<TCPConfiguration*>(source);
-    Q_ASSERT(usource != NULL);
+    auto* usource = qobject_cast<TCPConfiguration*>(source);
+    Q_ASSERT(usource != nullptr);
     _port    = usource->port();
     _address = usource->address();
 }
@@ -302,7 +269,7 @@ void TCPConfiguration::setHost(const QString host)
     if(ipAdd.isEmpty()) {
         qWarning() << "TCP:" << "Could not resolve host:" << host;
     } else {
-        _address = ipAdd;
+        _address = QHostAddress(ipAdd);
     }
 }
 
@@ -319,16 +286,6 @@ void TCPConfiguration::loadSettings(QSettings& settings, const QString& root)
     settings.beginGroup(root);
     _port = (quint16)settings.value("port", QGC_TCP_PORT).toUInt();
     QString address = settings.value("host", _address.toString()).toString();
-    _address = address;
+    _address = QHostAddress(address);
     settings.endGroup();
-}
-
-void TCPConfiguration::updateSettings()
-{
-    if(_link) {
-        TCPLink* ulink = dynamic_cast<TCPLink*>(_link);
-        if(ulink) {
-            ulink->_restartConnection();
-        }
-    }
 }

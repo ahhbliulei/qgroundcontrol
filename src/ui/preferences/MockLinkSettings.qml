@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   (c) 2009-2016 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
  *
  * QGroundControl is licensed according to the terms in the file
  * COPYING.md in the root of the source code directory.
@@ -21,6 +21,7 @@ Column {
     id:                 mockLinkSettings
     spacing:            ScreenTools.defaultFontPixelHeight * 0.5
     anchors.margins:    ScreenTools.defaultFontPixelWidth
+
     function saveSettings() {
         if(px4Firmware.checked)
             subEditConfig.firmware = 12         // Hardcoded MAV_AUTOPILOT_PX4
@@ -34,7 +35,9 @@ Column {
         else
             subEditConfig.firmware = 0
         subEditConfig.sendStatus = sendStatus.checked
+        subEditConfig.incrementVehicleId = incrementVehicleId.checked
     }
+
     Component.onCompleted: {
         if(subEditConfig.firmware === 12)       // Hardcoded MAV_AUTOPILOT_PX4
             px4Firmware.checked = true
@@ -47,10 +50,17 @@ Column {
         else
             copterVehicle.checked = true
         sendStatus.checked = subEditConfig.sendStatus
+        incrementVehicleId.checked = subEditConfig.incrementVehicleId
     }
+
     QGCCheckBox {
         id:             sendStatus
         text:           qsTr("Send Status Text and Voice")
+        checked:        false
+    }
+    QGCCheckBox {
+        id:             incrementVehicleId
+        text:           qsTr("Increment Vehicle Id")
         checked:        false
     }
     Item {
@@ -58,24 +68,20 @@ Column {
         width:  parent.width
     }
     ColumnLayout {
-        ExclusiveGroup { id: autoPilotGroup }
         QGCRadioButton {
             id:         px4Firmware
             text:       qsTr("PX4 Firmware")
             checked:    false
-            exclusiveGroup: autoPilotGroup
         }
         QGCRadioButton {
             id:         apmFirmware
             text:       qsTr("APM Firmware")
             checked:    false
-            exclusiveGroup: autoPilotGroup
         }
         QGCRadioButton {
             id:         genericFirmware
             text:       qsTr("Generic Firmware")
             checked:    false
-            exclusiveGroup: autoPilotGroup
         }
     }
     Item {
@@ -88,18 +94,15 @@ Column {
     }
     ColumnLayout {
         visible:        apmFirmware.checked
-        ExclusiveGroup { id: apmVehicleGroup }
         QGCRadioButton {
             id:         copterVehicle
             text:       qsTr("ArduCopter")
             checked:    false
-            exclusiveGroup: apmVehicleGroup
         }
         QGCRadioButton {
             id:         planeVehicle
             text:       qsTr("ArduPlane")
             checked:    false
-            exclusiveGroup: apmVehicleGroup
         }
     }
 }

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   (c) 2009-2016 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
  *
  * QGroundControl is licensed according to the terms in the file
  * COPYING.md in the root of the source code directory.
@@ -20,7 +20,7 @@ import QGroundControl.FactControls  1.0
 import QGroundControl.ScreenTools   1.0
 import QGroundControl.Controllers   1.0
 
-FactPanel {
+Item {
     id:     _root
     height: monitorColumn.height
 
@@ -30,11 +30,8 @@ FactPanel {
     readonly property int _pwmMax:      2200
     readonly property int _pwmRange:    _pwmMax - _pwmMin
 
-    QGCPalette { id: qgcPal; colorGroupEnabled: _root.enabled }
-
     RCChannelMonitorController {
         id:             controller
-        factPanel:      _root
     }
 
     // Live channel monitor control component
@@ -62,7 +59,7 @@ FactPanel {
             // Center point
             Rectangle {
                 anchors.horizontalCenter:   parent.horizontalCenter
-                width:                      ScreenTools.defaultTextWidth / 2
+                width:                      ScreenTools.defaultFontPixelWidth / 2
                 height:                     parent.height
                 color:                      qgcPal.window
             }

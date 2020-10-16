@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   (c) 2009-2016 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
  *
  * QGroundControl is licensed according to the terms in the file
  * COPYING.md in the root of the source code directory.
@@ -20,10 +20,6 @@ import QGroundControl.ScreenTools   1.0
 
 Item {
     id: root
-
-    // The following properties must be pushed in from the Loader
-    //property var qgcView      - QGCView control
-    //property var qgcViewPanel - QGCViewPanel control
 
     property real _margins:             ScreenTools.defaultFontPixelHeight / 2
     property var  _switchNameList:      [ "ACRO", "ARM", "GEAR", "KILL", "LOITER", "OFFB", "POSCTL", "RATT", "RETURN", "STAB" ]
@@ -53,7 +49,6 @@ Item {
 
     PX4SimpleFlightModesController {
         id:         controller
-        factPanel:  qgcViewPanel
     }
 
     QGCFlickable {
@@ -86,52 +81,49 @@ Item {
                         height:             flightModeColumn.height + ScreenTools.defaultFontPixelHeight
                         color:              qgcPal.windowShade
 
-                        ColumnLayout {
+                        GridLayout {
                             id:                 flightModeColumn
                             anchors.margins:    ScreenTools.defaultFontPixelWidth
                             anchors.left:       parent.left
                             anchors.top:        parent.top
-                            spacing:            ScreenTools.defaultFontPixelHeight
+                            rows:               7
+                            rowSpacing:         ScreenTools.defaultFontPixelWidth / 2
+                            columnSpacing:      rowSpacing
+                            flow:               GridLayout.TopToBottom
 
-                            RowLayout {
+                            QGCLabel {
                                 Layout.fillWidth:   true
-                                spacing:            _margins
-
-                                QGCLabel {
-                                    Layout.fillWidth:   true
-                                    text:               qsTr("Mode channel:")
-                                }
-
-                                FactComboBox {
-                                    Layout.preferredWidth:  _channelComboWidth
-                                    fact:                   controller.getParameterFact(-1, "RC_MAP_FLTMODE")
-                                    indexModel:             false
-                                }
+                                text:               qsTr("Mode Channel")
                             }
 
                             Repeater {
                                 model:  6
 
-                                RowLayout {
+                                QGCLabel {
                                     Layout.fillWidth:   true
-                                    spacing:            ScreenTools.defaultFontPixelWidth
-
-                                    property int index:         modelData + 1
-
-                                    QGCLabel {
-                                        Layout.fillWidth:   true
-                                        text:               qsTr("Flight Mode %1").arg(index)
-                                        color:              controller.activeFlightMode == index ? "yellow" : qgcPal.text
-                                    }
-
-                                    FactComboBox {
-                                        Layout.preferredWidth:  _channelComboWidth
-                                        fact:                   controller.getParameterFact(-1, "COM_FLTMODE" + index)
-                                        indexModel:             false
-                                    }
+                                    text:               qsTr("Flight Mode %1").arg(modelData + 1)
+                                    color:              (controller.activeFlightMode - 1) == index ? "yellow" : qgcPal.text
                                 }
-                            } // Repeater - Flight Modes
-                        } // Column - Flight Modes
+                            }
+
+                            FactComboBox {
+                                Layout.fillWidth:   true
+                                fact:               controller.getParameterFact(-1, "RC_MAP_FLTMODE")
+                                indexModel:         false
+                                sizeToContents:     true
+                            }
+
+                            Repeater {
+                                model:  6
+
+                                FactComboBox {
+                                    Layout.fillWidth:   true
+                                    fact:               controller.getParameterFact(-1, "COM_FLTMODE" + (modelData + 1))
+                                    indexModel:         false
+                                    sizeToContents:     true
+                                }
+                            }
+                        }
                     } // Rectangle - Flight Modes
                 } // Column - Flight mode settings
 
@@ -207,6 +199,6 @@ Item {
                     controller.getParameterFact(-1, "RC_MAP_FLTMODE").value = 0
                 }
             }
-        } // Column
-    } // QGCFlickable
-} // QGCView
+        }
+    }
+}
